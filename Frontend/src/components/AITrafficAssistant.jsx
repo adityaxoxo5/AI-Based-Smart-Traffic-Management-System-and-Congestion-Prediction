@@ -58,7 +58,7 @@ export default function AITrafficAssistant() {
             <h2 className="text-sm font-bold text-slate-100">
               AI Traffic Copilot
             </h2>
-            <p className="text-[11px] text-slate-400">Contextual traffic intelligence</p>
+            <p className="text-[11px] text-slate-400">Traffic Intelligence Chatbot</p>
           </div>
         </div>
         <button 

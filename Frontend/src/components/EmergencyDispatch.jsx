@@ -56,7 +56,7 @@ export default function EmergencyDispatch({ startCoords, destCoords, startQuery,
             <h2 className="text-sm font-bold text-slate-100">
               Emergency Vehicle Dispatch
             </h2>
-            <p className="text-[11px] text-slate-400">Dynamic facility priority allocation</p>
+            
           </div>
         </div>
 
@@ -78,9 +78,9 @@ export default function EmergencyDispatch({ startCoords, destCoords, startQuery,
               onChange={handleTypeChange}
               className="w-full bg-[#0d121d] border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-rose-500 cursor-pointer"
             >
-              <option value="Medical Emergency">🏥 Medical Emergency (Hospitals & ICU Units)</option>
-              <option value="Fire Incident">🚒 Fire Incident (Fire Stations & Rescue Brigades)</option>
-              <option value="Vehicle Collision">🚓 Vehicle Collision (Traffic Police & Highway Patrol)</option>
+              <option value="Medical Emergency">🏥 Medical Emergency </option>
+              <option value="Fire Incident">🚒 Fire Incident </option>
+              <option value="Vehicle Collision">🚓 Vehicle Collision </option>
             </select>
           </div>
 

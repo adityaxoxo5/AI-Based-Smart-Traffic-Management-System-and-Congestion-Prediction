@@ -1,10 +1,11 @@
 import React from 'react';
-import { Navigation, BarChart2, AlertTriangle, Bot, Siren } from 'lucide-react';
+import { Navigation, BarChart2, AlertTriangle, Bot, Siren, Sliders } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     { id: 'route', label: 'Route Planner', icon: Navigation },
     { id: 'analytics', label: 'Analytics Dashboard', icon: BarChart2 },
+    { id: 'signals', label: 'Adaptive Signals', icon: Sliders },
     { id: 'hotspots', label: 'Accident Hotspots', icon: AlertTriangle },
     { id: 'insights', label: 'AI Traffic Assistant', icon: Bot },
     { id: 'dispatch', label: 'Emergency Routing', icon: Siren },
@@ -44,10 +45,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
         </nav>
       </div>
 
-      {/* Footer */}
-      <div className="px-3 py-2 border-t border-slate-800/60 text-xs text-slate-500 font-mono">
-        Smart Traffic v0.1
-      </div>
+     
     </div>
   );
 };

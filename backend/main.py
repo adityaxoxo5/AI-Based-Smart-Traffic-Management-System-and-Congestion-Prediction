@@ -1,6 +1,7 @@
 import os
 import json
 from dotenv import load_dotenv
+from typing import Optional, List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -8,6 +9,7 @@ from ml.predictor import predictor
 from ml.cluster_hotspots import generate_route_hotspots
 from ml.dijkstra_routing import dijkstra_router
 from ml.arima_forecast import generate_24h_arima_forecast
+from ml.signal_optimizer import signal_optimizer
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,10 +38,11 @@ class RoutePredictionRequest(BaseModel):
     model_type: str = "xgb"
 
 class HotspotsRequest(BaseModel):
-    start_lat: float = 51.5074
-    start_lon: float = -0.1278
-    dest_lat: float = 48.8566
-    dest_lon: float = 2.3522
+    start_lat: float = 17.3850
+    start_lon: float = 78.4867
+    dest_lat: float = 17.4435
+    dest_lon: float = 78.3772
+    route_coords: Optional[list] = None
 
 class DijkstraRequest(BaseModel):
     start_lat: float = 17.3457
@@ -138,7 +141,7 @@ def get_hotspots_default():
 @app.post("/api/hotspots")
 def get_hotspots_route(req: HotspotsRequest):
     try:
-        return generate_route_hotspots(req.start_lat, req.start_lon, req.dest_lat, req.dest_lon)
+        return generate_route_hotspots(req.start_lat, req.start_lon, req.dest_lat, req.dest_lon, req.route_coords)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -333,65 +336,109 @@ def fetch_live_osm_facilities(lat: float, lon: float, incident_type: str, route_
 
     itype = incident_type.lower()
     if "fire" in itype:
-        query_type = "fire station"
+        osm_amenity = "fire_station"
         fallback_type = "Fire & Rescue Station"
     elif "collision" in itype or "accident" in itype:
-        query_type = "police station"
+        osm_amenity = "police"
         fallback_type = "Traffic Police Unit"
     else: # Medical Emergency
-        query_type = "hospital"
+        osm_amenity = "hospital"
         fallback_type = "Hospital & Medical Center"
 
-    # Step 1: Discover City / Area Name from Latitude & Longitude
-    target_location = ""
-    if route_hint and "→" in route_hint:
-        target_location = route_hint.split('→')[0].strip()
-    elif route_hint and "->" in route_hint:
-        target_location = route_hint.split('->')[0].strip()
+    headers = {'User-Agent': 'SmartTrafficSystem/2.0 (student.project.traffic@gmail.com)'}
 
-    if not target_location or len(target_location) < 2:
-        try:
-            url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-            headers = {'User-Agent': 'SmartTrafficSystem/1.0'}
-            res = requests.get(url, headers=headers, timeout=3)
-            if res.status_code == 200:
-                addr = res.json().get('address', {})
-                target_location = addr.get('city') or addr.get('town') or addr.get('suburb') or addr.get('state') or "Hyderabad"
-        except Exception:
-            target_location = "Hyderabad"
-
-    # Step 2: Query Live OpenStreetMap POIs in that exact target city!
+    # Step 1: Discover Real Neighborhood and City Name from GPS (lat, lon)
+    suburb_name = ""
+    city_name = ""
     try:
-        url = f"https://nominatim.openstreetmap.org/search?q={query_type}+in+{urllib.parse.quote(target_location)}&format=json&limit=4"
-        headers = {'User-Agent': 'SmartTrafficSystem/1.0'}
-        res = requests.get(url, headers=headers, timeout=3)
+        rev_url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+        rev_res = requests.get(rev_url, headers=headers, timeout=3.5)
+        if rev_res.status_code == 200:
+            addr = rev_res.json().get('address', {})
+            suburb_name = addr.get('suburb') or addr.get('neighbourhood') or addr.get('city_district') or addr.get('road') or ""
+            city_name = addr.get('city') or addr.get('town') or addr.get('state_district') or addr.get('state') or ""
+    except Exception:
+        pass
+
+    if not city_name or any(k in city_name.lower() for k in ["current", "location", "gps"]):
+        city_name = "Regional"
+    if suburb_name:
+        suburb_name = suburb_name.split(',')[0].strip()
+
+    # Step 2: Spatial Bounding Coordinate Search directly around (lat, lon) within ~12km
+    hubs = []
+    try:
+        viewbox = f"{round(lon - 0.12, 4)},{round(lat + 0.12, 4)},{round(lon + 0.12, 4)},{round(lat - 0.12, 4)}"
+        spatial_url = f"https://nominatim.openstreetmap.org/search?amenity={osm_amenity}&bounded=1&viewbox={viewbox}&format=json&limit=6"
+        res = requests.get(spatial_url, headers=headers, timeout=4.0)
         if res.status_code == 200:
             data = res.json()
-            hubs = []
             for idx, item in enumerate(data):
-                display = item.get('display_name', '').split(',')[0]
+                disp_parts = [p.strip() for p in item.get('display_name', '').split(',') if p.strip()]
+                raw_name = disp_parts[0] if len(disp_parts) > 0 else ""
+                locality = disp_parts[1] if len(disp_parts) > 1 else suburb_name or city_name
+
+                # Clean generic unnamed tags like "hospital", "police", "fire_station"
+                if raw_name.lower() in ["hospital", "hospitals", "police", "police station", "fire station", "fire_station", "clinic", "dispensary"]:
+                    clean_name = f"{locality} {fallback_type}"
+                elif len(raw_name) >= 3:
+                    clean_name = raw_name
+                else:
+                    clean_name = f"{locality} {fallback_type}"
+
                 plat = float(item['lat'])
                 plon = float(item['lon'])
-                if display and len(display) > 2:
-                    hubs.append({
-                        "id": f"HUB-0{idx+1}",
-                        "name": display,
-                        "lat": round(plat, 4),
-                        "lon": round(plon, 4),
-                        "type": f"OSM Verified {fallback_type}",
-                        "vehicles_avail": (idx % 3) + 3
-                    })
-            if len(hubs) >= 1:
-                return hubs
+                hubs.append({
+                    "id": f"HUB-0{len(hubs) + 1}",
+                    "name": clean_name,
+                    "lat": round(plat, 4),
+                    "lon": round(plon, 4),
+                    "type": f"Verified {fallback_type}",
+                    "vehicles_avail": (idx % 3) + 3
+                })
+                if len(hubs) >= 4:
+                    break
     except Exception as e:
-        print("[Live OSM POI Error]", e)
+        print("[Live Spatial OSM POI Error]", e)
 
-    # Step 3: Generic city-named fallback if remote area has unmapped POIs
+    if len(hubs) >= 2:
+        return hubs
+
+    # Step 3: Text Query Search in City if Spatial Box had low density
+    if city_name and city_name != "Regional":
+        try:
+            text_url = f"https://nominatim.openstreetmap.org/search?q={osm_amenity}+in+{urllib.parse.quote(city_name)}&format=json&limit=4"
+            t_res = requests.get(text_url, headers=headers, timeout=3.5)
+            if t_res.status_code == 200:
+                for idx, item in enumerate(t_res.json()):
+                    disp_parts = [p.strip() for p in item.get('display_name', '').split(',') if p.strip()]
+                    raw_name = disp_parts[0] if disp_parts else ""
+                    if raw_name.lower() in ["hospital", "police", "fire station", "police station"]:
+                        raw_name = f"{disp_parts[1] if len(disp_parts)>1 else city_name} {fallback_type}"
+                    if raw_name:
+                        hubs.append({
+                            "id": f"HUB-0{len(hubs) + 1}",
+                            "name": raw_name,
+                            "lat": round(float(item['lat']), 4),
+                            "lon": round(float(item['lon']), 4),
+                            "type": f"Verified {fallback_type}",
+                            "vehicles_avail": (idx % 3) + 3
+                        })
+                        if len(hubs) >= 4:
+                            return hubs
+        except Exception:
+            pass
+
+    if len(hubs) >= 1:
+        return hubs
+
+    # Step 4: Named Local Facility Fallback with verified suburb and city tags
+    base_label = f"{suburb_name}, {city_name}" if suburb_name and city_name != "Regional" else city_name
     return [
-        {"id": "HUB-01", "name": f"{target_location} Central {fallback_type}", "lat": round(lat + 0.010, 4), "lon": round(lon + 0.008, 4), "type": fallback_type, "vehicles_avail": 4},
-        {"id": "HUB-02", "name": f"{target_location} East {fallback_type}", "lat": round(lat - 0.012, 4), "lon": round(lon - 0.015, 4), "type": fallback_type, "vehicles_avail": 3},
-        {"id": "HUB-03", "name": f"{target_location} North {fallback_type}", "lat": round(lat + 0.015, 4), "lon": round(lon - 0.010, 4), "type": fallback_type, "vehicles_avail": 5},
-        {"id": "HUB-04", "name": f"{target_location} West {fallback_type}", "lat": round(lat - 0.008, 4), "lon": round(lon + 0.012, 4), "type": fallback_type, "vehicles_avail": 2},
+        {"id": "HUB-01", "name": f"{base_label} Emergency Care Center", "lat": round(lat + 0.008, 4), "lon": round(lon + 0.006, 4), "type": fallback_type, "vehicles_avail": 4},
+        {"id": "HUB-02", "name": f"{base_label} District {fallback_type}", "lat": round(lat - 0.009, 4), "lon": round(lon - 0.007, 4), "type": fallback_type, "vehicles_avail": 3},
+        {"id": "HUB-03", "name": f"{base_label} Trauma Care Division", "lat": round(lat + 0.012, 4), "lon": round(lon - 0.008, 4), "type": fallback_type, "vehicles_avail": 5},
+        {"id": "HUB-04", "name": f"{base_label} Response Unit", "lat": round(lat - 0.006, 4), "lon": round(lon + 0.010, 4), "type": fallback_type, "vehicles_avail": 2},
     ]
 
 @app.post("/api/emergency/dispatch")
@@ -421,6 +468,29 @@ def compute_emergency_dispatch(req: EmergencyRequest):
         "dispatch_status": "DISPATCH_UNIT_ALLOCATED",
         "all_stations": dynamic_stations
     }
+
+# ========================================================
+# MILESTONE 6: ADAPTIVE TRAFFIC SIGNAL OPTIMIZER (WEBSTER)
+# ========================================================
+class SignalOptimizationRequest(BaseModel):
+    north_flow: int = 650
+    south_flow: int = 580
+    east_flow: int = 1100
+    west_flow: int = 350
+    emergency_override: Optional[str] = None
+
+@app.post("/api/signals/optimize")
+def optimize_traffic_signals(req: SignalOptimizationRequest):
+    try:
+        return signal_optimizer.optimize_intersection(
+            north_flow=req.north_flow,
+            south_flow=req.south_flow,
+            east_flow=req.east_flow,
+            west_flow=req.west_flow,
+            emergency_override=req.emergency_override
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

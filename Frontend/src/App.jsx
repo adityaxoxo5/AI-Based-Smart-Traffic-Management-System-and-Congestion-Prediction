@@ -6,6 +6,7 @@ import AnalyticsDashboard from './components/AnalyticsDashboard';
 import AccidentHotspots from './components/AccidentHotspots';
 import AITrafficAssistant from './components/AITrafficAssistant';
 import EmergencyDispatch from './components/EmergencyDispatch';
+import SignalController from './components/SignalController';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('route');
@@ -33,7 +34,8 @@ export default function App() {
         start_lat: start.lat,
         start_lon: start.lon,
         dest_lat: dest.lat,
-        dest_lon: dest.lon
+        dest_lon: dest.lon,
+        route_coords: foundRoutes[0]?.coordinates || []
       })
     })
       .then((res) => res.json())
@@ -63,6 +65,7 @@ export default function App() {
         />
       )}
       {activeTab === 'analytics' && <AnalyticsDashboard startCoords={startCoords} destCoords={destCoords} />}
+      {activeTab === 'signals' && <SignalController />}
       {activeTab === 'hotspots' && <AccidentHotspots hotspots={hotspots} />}
       {activeTab === 'insights' && <AITrafficAssistant />}
       {activeTab === 'dispatch' && (
@@ -74,16 +77,18 @@ export default function App() {
         />
       )}
 
-      <div className="flex-1 h-full relative">
-        <MapView
-          routes={routes}
-          selectedRouteId={selectedRouteId}
-          startCoords={startCoords}
-          destCoords={destCoords}
-          hotspots={hotspots}
-          activeTab={activeTab}
-        />
-      </div>
+      {activeTab !== 'signals' && (
+        <div className="flex-1 h-full relative">
+          <MapView
+            routes={routes}
+            selectedRouteId={selectedRouteId}
+            startCoords={startCoords}
+            destCoords={destCoords}
+            hotspots={hotspots}
+            activeTab={activeTab}
+          />
+        </div>
+      )}
     </div>
   );
 }

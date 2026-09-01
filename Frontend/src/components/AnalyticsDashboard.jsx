@@ -87,7 +87,7 @@ const AnalyticsDashboard = ({ startCoords, destCoords }) => {
         <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono font-bold uppercase mb-1">
           <Cpu className="w-4 h-4" />
         </div>
-        <h2 className="text-xl font-bold text-slate-100">Analytics & Prediction Sandbox</h2>
+        <h2 className="text-xl font-bold text-slate-100">Analytics & Prediction Dashboard</h2>
       </div>
 
       {/* 2. Interactive Prediction Sandbox */}
@@ -95,14 +95,14 @@ const AnalyticsDashboard = ({ startCoords, destCoords }) => {
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
           <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-1.5">
             <Sliders className="w-4 h-4 text-amber-400" />
-            <span>Interactive Model Simulator</span>
+            <span>Machine Learning Model Simulator</span>
           </span>
         </div>
 
         {/* Model Architecture Switcher (ML vs DL) */}
         <div className="mb-4">
           <label className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block mb-1.5">
-            Select Active Inference Engine:
+            Select Active Model Architecture:
           </label>
           <div className="grid grid-cols-2 gap-1.5">
             <button
@@ -117,7 +117,7 @@ const AnalyticsDashboard = ({ startCoords, destCoords }) => {
               }`}
             >
               <Cpu className="w-3.5 h-3.5" />
-              <span>XGBoost (ML)</span>
+              <span>XGBoost</span>
             </button>
 
             <button
@@ -132,7 +132,7 @@ const AnalyticsDashboard = ({ startCoords, destCoords }) => {
               }`}
             >
               <Brain className="w-3.5 h-3.5 text-purple-400" />
-              <span>MLP-DNN (DL)</span>
+              <span>MLP</span>
             </button>
           </div>
         </div>
@@ -267,9 +267,9 @@ const AnalyticsDashboard = ({ startCoords, destCoords }) => {
         <div className="bg-[#131a28] p-4 rounded-xl border border-slate-800">
           <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center space-x-1.5 font-mono">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <span>ARIMA(2,1,1) 24-Hour Forecast</span>
+            <span>ARIMA 24-Hour Forecast</span>
           </h3>
-          <p className="text-[10px] text-slate-400 mb-3">Statistical time-series trend prediction curve</p>
+          
           <div className="h-40 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={arimaData}>
