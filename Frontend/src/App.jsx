@@ -7,6 +7,7 @@ import AccidentHotspots from './components/AccidentHotspots';
 import AITrafficAssistant from './components/AITrafficAssistant';
 import EmergencyDispatch from './components/EmergencyDispatch';
 import SignalController from './components/SignalController';
+import VehicleDetection from './components/VehicleDetection';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('route');
@@ -66,6 +67,7 @@ export default function App() {
       )}
       {activeTab === 'analytics' && <AnalyticsDashboard startCoords={startCoords} destCoords={destCoords} />}
       {activeTab === 'signals' && <SignalController />}
+      {activeTab === 'detection' && <VehicleDetection />}
       {activeTab === 'hotspots' && <AccidentHotspots hotspots={hotspots} />}
       {activeTab === 'insights' && <AITrafficAssistant />}
       {activeTab === 'dispatch' && (
@@ -77,7 +79,7 @@ export default function App() {
         />
       )}
 
-      {activeTab !== 'signals' && (
+      {activeTab !== 'signals' && activeTab !== 'detection' && (
         <div className="flex-1 h-full relative">
           <MapView
             routes={routes}

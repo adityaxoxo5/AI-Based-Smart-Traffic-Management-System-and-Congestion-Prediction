@@ -1,9 +1,9 @@
-# Environment variables (contains GEMINI_API_KEY - never commit)
+# Environment variables
 .env
 .env.local
 .env.*.local
 
-# Python cache/bytecode
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
@@ -26,30 +26,41 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# ML model artifacts (regenerate with: python train_models.py)
+# ML artifacts
 ml/artifacts/
 artifacts/
+backend/ml/artifacts/
 
-# Generated/fallback dataset (regenerate via dataloader.py)
+# Generated/fallback datasets
 ml/data/
 data/*.csv
+backend/ml/data/
+backend/data/*.csv
 
 # Jupyter
 .ipynb_checkpoints/
 
-# Editor/IDE
+# IDE
 .vscode/
 .idea/
 *.swp
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
+
+# Generated/uploaded traffic files
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+backend/outputs/*
+!backend/outputs/.gitkeep
+
+# YOLO models
+*.pt
 
 # Logs
 *.log
 
-# Distribution/build
-build/
-dist/
+# Build/distribution
 *.egg-info/

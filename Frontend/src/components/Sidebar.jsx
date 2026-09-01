@@ -1,11 +1,12 @@
 import React from 'react';
-import { Navigation, BarChart2, AlertTriangle, Bot, Siren, Sliders } from 'lucide-react';
+import { Navigation, BarChart2, AlertTriangle, Bot, Siren, Sliders, Camera } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     { id: 'route', label: 'Route Planner', icon: Navigation },
     { id: 'analytics', label: 'Analytics Dashboard', icon: BarChart2 },
     { id: 'signals', label: 'Adaptive Signals', icon: Sliders },
+    { id: 'detection', label: 'Vehicle Detection', icon: Camera },
     { id: 'hotspots', label: 'Accident Hotspots', icon: AlertTriangle },
     { id: 'insights', label: 'AI Traffic Assistant', icon: Bot },
     { id: 'dispatch', label: 'Emergency Routing', icon: Siren },
