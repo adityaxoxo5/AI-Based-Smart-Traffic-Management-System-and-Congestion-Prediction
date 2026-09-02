@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from ml.predictor import predictor
 from ml.cluster_hotspots import generate_route_hotspots
-from ml.dijkstra_routing import dijkstra_router
+# from ml.dijkstra_routing import dijkstra_router
 from ml.arima_forecast import generate_24h_arima_forecast
 from ml.signal_optimizer import signal_optimizer
 
@@ -47,12 +47,12 @@ class HotspotsRequest(BaseModel):
     dest_lon: float = 78.3772
     route_coords: Optional[list] = None
 
-class DijkstraRequest(BaseModel):
-    start_lat: float = 17.3457
-    start_lon: float = 78.5522
-    dest_lat: float = 17.4435
-    dest_lon: float = 78.3772
-    ml_congestion_index: float = 50.0
+# class DijkstraRequest(BaseModel):
+#     start_lat: float = 17.3457
+#     start_lon: float = 78.5522
+#     dest_lat: float = 17.4435
+#     dest_lon: float = 78.3772
+#     ml_congestion_index: float = 50.0
 
 @app.get("/api/geocode")
 def geocode_location(q: str):
@@ -300,16 +300,7 @@ CRITICAL INSTRUCTIONS:
         "timestamp": "Fallback Mode"
     }
 
-@app.post("/api/routing/dijkstra")
-def compute_dijkstra_route(req: DijkstraRequest):
-    try:
-        return dijkstra_router.find_optimal_dijkstra_path(
-            start_coords={"lat": req.start_lat, "lon": req.start_lon},
-            dest_coords={"lat": req.dest_lat, "lon": req.dest_lon},
-            ml_congestion_index=req.ml_congestion_index
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/forecast/arima")
 def get_arima_forecast(hour: int = 12, start_lat: float = None, start_lon: float = None, dest_lat: float = None, dest_lon: float = None):

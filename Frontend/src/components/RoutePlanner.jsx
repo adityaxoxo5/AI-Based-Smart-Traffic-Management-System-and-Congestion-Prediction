@@ -72,38 +72,8 @@ const RoutePlanner = ({
 
       const res = await calculateRoute(currentStart, currentDest);
 
-      // Fetch Dynamic ML-Weighted Dijkstra Path
-      try {
-        const dijkstraRes = await fetch('http://127.0.0.1:8000/api/routing/dijkstra', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            start_lat: currentStart.lat,
-            start_lon: currentStart.lon,
-            dest_lat: currentDest.lat,
-            dest_lon: currentDest.lon,
-            ml_congestion_index: res[0]?.congestionIndex || 45.0
-          })
-        });
-        if (dijkstraRes.ok) {
-          const dijkstraData = await dijkstraRes.json();
-          if (dijkstraData.coordinates && dijkstraData.coordinates.length > 0) {
-            res.push({
-              id: res.length,
-              isPrimary: false,
-              name: "Dijkstra Graph Path",
-              distanceKm: dijkstraData.total_distance_km,
-              durationMins: Math.round(dijkstraData.total_distance_km * 1.3),
-              formattedTime: `${Math.round(dijkstraData.total_distance_km * 1.3)} mins`,
-              congestionIndex: res[0]?.congestionIndex || 45.0,
-              status: "Optimized Graph Path",
-              coordinates: dijkstraData.coordinates
-            });
-          }
-        }
-      } catch (err) {
-        console.warn("Dijkstra route fetch skipped:", err);
-      }
+     
+
 
       setRoutes(res);
       onRoutesFound(res, currentStart, currentDest);

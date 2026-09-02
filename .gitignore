@@ -64,3 +64,6 @@ backend/outputs/*
 
 # Build/distribution
 *.egg-info/
+
+# Backend cache
+backend/cache/
