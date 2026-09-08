@@ -8,6 +8,7 @@ import AITrafficAssistant from './components/AITrafficAssistant';
 import EmergencyDispatch from './components/EmergencyDispatch';
 import SignalController from './components/SignalController';
 import VehicleDetection from './components/VehicleDetection';
+import LiveNavigation from './components/LiveNavigation';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('route');
@@ -27,7 +28,6 @@ export default function App() {
     setStartCoords(start);
     setDestCoords(dest);
 
-    // Fetch Route-Specific Hotspots from FastAPI
     fetch('http://127.0.0.1:8000/api/hotspots', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -43,6 +43,9 @@ export default function App() {
       .then((data) => setHotspots(data))
       .catch((err) => console.error("Error fetching route hotspots:", err));
   };
+
+  // Tabs that render their own full-screen map (hide the main MapView)
+  const fullScreenTabs = ['signals', 'detection', 'navigate'];
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#0d121d]">
@@ -65,12 +68,19 @@ export default function App() {
           onRoutesFound={handleRoutesFound}
         />
       )}
+      {activeTab === 'navigate' && (
+        <LiveNavigation
+          routes={routes}
+          startQuery={startQuery}
+          destQuery={destQuery}
+        />
+      )}
       {activeTab === 'analytics' && <AnalyticsDashboard startCoords={startCoords} destCoords={destCoords} />}
-      {activeTab === 'signals' && <SignalController />}
+      {activeTab === 'signals'   && <SignalController />}
       {activeTab === 'detection' && <VehicleDetection />}
-      {activeTab === 'hotspots' && <AccidentHotspots hotspots={hotspots} />}
-      {activeTab === 'insights' && <AITrafficAssistant />}
-      {activeTab === 'dispatch' && (
+      {activeTab === 'hotspots'  && <AccidentHotspots hotspots={hotspots} />}
+      {activeTab === 'insights'  && <AITrafficAssistant />}
+      {activeTab === 'dispatch'  && (
         <EmergencyDispatch 
           startCoords={startCoords}
           destCoords={destCoords}
@@ -79,7 +89,7 @@ export default function App() {
         />
       )}
 
-      {activeTab !== 'signals' && activeTab !== 'detection' && (
+      {!fullScreenTabs.includes(activeTab) && (
         <div className="flex-1 h-full relative">
           <MapView
             routes={routes}
@@ -93,4 +103,4 @@ export default function App() {
       )}
     </div>
   );
-}
+}

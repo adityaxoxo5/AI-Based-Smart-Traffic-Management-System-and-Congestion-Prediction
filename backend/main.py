@@ -301,19 +301,22 @@ CRITICAL INSTRUCTIONS:
     }
 
 
-
 @app.get("/api/forecast/arima")
-def get_arima_forecast(hour: int = 12, start_lat: float = None, start_lon: float = None, dest_lat: float = None, dest_lon: float = None):
-    try:
-        return generate_24h_arima_forecast(
-            current_hour=hour,
-            start_lat=start_lat,
-            start_lon=start_lon,
-            dest_lat=dest_lat,
-            dest_lon=dest_lon
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def get_arima_forecast(
+    hour:int,
+    start_lat:float,
+    start_lon:float,
+    dest_lat:float,
+    dest_lon:float
+):
+
+    return generate_24h_arima_forecast(
+        hour,
+        start_lat,
+        start_lon,
+        dest_lat,
+        dest_lon
+    )
 
 # ========================================================
 # MILESTONE 5: VORONOI EMERGENCY VEHICLE DISPATCH ENDPOINT
@@ -341,7 +344,7 @@ def fetch_live_osm_facilities(lat: float, lon: float, incident_type: str, route_
 
     headers = {'User-Agent': 'SmartTrafficSystem/2.0 (student.project.traffic@gmail.com)'}
 
-    # Step 1: Discover Real Neighborhood and City Name from GPS (lat, lon)
+    # Step 1: Reverse geocode to get suburb/city name
     suburb_name = ""
     city_name = ""
     try:
@@ -359,10 +362,11 @@ def fetch_live_osm_facilities(lat: float, lon: float, incident_type: str, route_
     if suburb_name:
         suburb_name = suburb_name.split(',')[0].strip()
 
-    # Step 2: Spatial Bounding Coordinate Search directly around (lat, lon) within ~12km
+    # Step 2: Tight spatial bounding box ~5km radius around incident point
     hubs = []
     try:
-        viewbox = f"{round(lon - 0.12, 4)},{round(lat + 0.12, 4)},{round(lon + 0.12, 4)},{round(lat - 0.12, 4)}"
+        delta = 0.045  # ~5km radius (was 0.12 = ~13km, causing far results)
+        viewbox = f"{round(lon - delta, 4)},{round(lat + delta, 4)},{round(lon + delta, 4)},{round(lat - delta, 4)}"
         spatial_url = f"https://nominatim.openstreetmap.org/search?amenity={osm_amenity}&bounded=1&viewbox={viewbox}&format=json&limit=6"
         res = requests.get(spatial_url, headers=headers, timeout=4.0)
         if res.status_code == 200:
@@ -372,7 +376,6 @@ def fetch_live_osm_facilities(lat: float, lon: float, incident_type: str, route_
                 raw_name = disp_parts[0] if len(disp_parts) > 0 else ""
                 locality = disp_parts[1] if len(disp_parts) > 1 else suburb_name or city_name
 
-                # Clean generic unnamed tags like "hospital", "police", "fire_station"
                 if raw_name.lower() in ["hospital", "hospitals", "police", "police station", "fire station", "fire_station", "clinic", "dispensary"]:
                     clean_name = f"{locality} {fallback_type}"
                 elif len(raw_name) >= 3:
@@ -380,59 +383,29 @@ def fetch_live_osm_facilities(lat: float, lon: float, incident_type: str, route_
                 else:
                     clean_name = f"{locality} {fallback_type}"
 
-                plat = float(item['lat'])
-                plon = float(item['lon'])
+                plat_item = float(item['lat'])
+                plon_item = float(item['lon'])
                 hubs.append({
                     "id": f"HUB-0{len(hubs) + 1}",
                     "name": clean_name,
-                    "lat": round(plat, 4),
-                    "lon": round(plon, 4),
+                    "lat": round(plat_item, 4),
+                    "lon": round(plon_item, 4),
                     "type": f"Verified {fallback_type}",
-                    "vehicles_avail": (idx % 3) + 3
                 })
-                if len(hubs) >= 4:
+                if len(hubs) >= 5:
                     break
     except Exception as e:
         print("[Live Spatial OSM POI Error]", e)
 
-    if len(hubs) >= 2:
-        return hubs
-
-    # Step 3: Text Query Search in City if Spatial Box had low density
-    if city_name and city_name != "Regional":
-        try:
-            text_url = f"https://nominatim.openstreetmap.org/search?q={osm_amenity}+in+{urllib.parse.quote(city_name)}&format=json&limit=4"
-            t_res = requests.get(text_url, headers=headers, timeout=3.5)
-            if t_res.status_code == 200:
-                for idx, item in enumerate(t_res.json()):
-                    disp_parts = [p.strip() for p in item.get('display_name', '').split(',') if p.strip()]
-                    raw_name = disp_parts[0] if disp_parts else ""
-                    if raw_name.lower() in ["hospital", "police", "fire station", "police station"]:
-                        raw_name = f"{disp_parts[1] if len(disp_parts)>1 else city_name} {fallback_type}"
-                    if raw_name:
-                        hubs.append({
-                            "id": f"HUB-0{len(hubs) + 1}",
-                            "name": raw_name,
-                            "lat": round(float(item['lat']), 4),
-                            "lon": round(float(item['lon']), 4),
-                            "type": f"Verified {fallback_type}",
-                            "vehicles_avail": (idx % 3) + 3
-                        })
-                        if len(hubs) >= 4:
-                            return hubs
-        except Exception:
-            pass
-
     if len(hubs) >= 1:
         return hubs
 
-    # Step 4: Named Local Facility Fallback with verified suburb and city tags
+    # Step 3: Named local fallback if OSM returns nothing (very rural areas)
     base_label = f"{suburb_name}, {city_name}" if suburb_name and city_name != "Regional" else city_name
     return [
-        {"id": "HUB-01", "name": f"{base_label} Emergency Care Center", "lat": round(lat + 0.008, 4), "lon": round(lon + 0.006, 4), "type": fallback_type, "vehicles_avail": 4},
-        {"id": "HUB-02", "name": f"{base_label} District {fallback_type}", "lat": round(lat - 0.009, 4), "lon": round(lon - 0.007, 4), "type": fallback_type, "vehicles_avail": 3},
-        {"id": "HUB-03", "name": f"{base_label} Trauma Care Division", "lat": round(lat + 0.012, 4), "lon": round(lon - 0.008, 4), "type": fallback_type, "vehicles_avail": 5},
-        {"id": "HUB-04", "name": f"{base_label} Response Unit", "lat": round(lat - 0.006, 4), "lon": round(lon + 0.010, 4), "type": fallback_type, "vehicles_avail": 2},
+        {"id": "HUB-01", "name": f"{base_label} Emergency Care Center", "lat": round(lat + 0.008, 4), "lon": round(lon + 0.006, 4), "type": fallback_type},
+        {"id": "HUB-02", "name": f"{base_label} District {fallback_type}", "lat": round(lat - 0.009, 4), "lon": round(lon - 0.007, 4), "type": fallback_type},
+        {"id": "HUB-03", "name": f"{base_label} Trauma Care Division", "lat": round(lat + 0.012, 4), "lon": round(lon - 0.008, 4), "type": fallback_type},
     ]
 
 @app.post("/api/emergency/dispatch")

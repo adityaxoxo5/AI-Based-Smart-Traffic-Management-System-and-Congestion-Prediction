@@ -2,192 +2,232 @@ import os
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.arima.model import ARIMA
+from math import radians, sin, cos, sqrt, atan2
+from datetime import datetime
 
-
-# ============================================================
-# DATASET PATH
-# ============================================================
 
 DATA_PATH = os.path.join(
     os.path.dirname(__file__),
     "data",
-    "smart_mobility_traffic.csv"
+    "smart_mobility_dataset.csv"
 )
 
 
-# ============================================================
-# LOAD AND PREPARE HISTORICAL TRAFFIC DATA
-# ============================================================
+def haversine(lat1, lon1, lat2, lon2):
 
-def load_traffic_data():
-    """
-    Load historical traffic data and convert the
-    15-minute congestion observations into hourly averages.
-    """
+    R = 6371
 
-    df = pd.read_csv(
-        DATA_PATH,
-        usecols=["timestamp", "congestion_index"]
+    dlat = radians(lat2-lat1)
+    dlon = radians(lon2-lon1)
+
+    a = (
+        sin(dlat/2)**2 +
+        cos(radians(lat1)) *
+        cos(radians(lat2)) *
+        sin(dlon/2)**2
     )
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    df["congestion_index"] = pd.to_numeric(
-        df["congestion_index"],
-        errors="coerce"
+    return R * 2 * atan2(
+        sqrt(a),
+        sqrt(1-a)
     )
 
-    # Remove invalid rows
-    df = df.dropna(subset=["timestamp", "congestion_index"])
 
-    # Sort chronologically
-    df = df.sort_values("timestamp")
+def load_dataset():
 
-    # Make timestamp the index
-    df = df.set_index("timestamp")
+    df = pd.read_csv(DATA_PATH)
 
-    # Convert 15-minute data → hourly average
-    hourly_data = df["congestion_index"].resample("1h").mean()
+    df["Timestamp"] = pd.to_datetime(
+        df["Timestamp"]
+    )
 
-    # Fill any missing hourly values
-    hourly_data = hourly_data.interpolate(method="linear")
-
-    # Keep values within traffic-index range
-    hourly_data = hourly_data.clip(0, 100)
-
-    return hourly_data
+    df["congestion_index"] = (
+        df["Traffic_Condition"]
+        .map({
+            "Low":25,
+            "Medium":55,
+            "High":85
+        })
+    )
 
 
-# ============================================================
-# ARIMA FORECAST
-# ============================================================
+    return df
+
+
 
 def generate_24h_arima_forecast(
-    current_hour=12,
-    start_lat=None,
-    start_lon=None,
-    dest_lat=None,
-    dest_lon=None
+        current_hour,
+        start_lat,
+        start_lon,
+        dest_lat,
+        dest_lon
 ):
-    """
-    Generate a 24-hour traffic congestion forecast
-    using a real ARIMA(2,1,1) model trained on
-    historical smart mobility traffic data.
 
-    Coordinates are retained for API compatibility
-    with the existing application.
-    """
+    df = load_dataset()
 
-    try:
 
-        # ----------------------------------------------------
-        # 1. Load historical data
-        # ----------------------------------------------------
+    # midpoint of route
+    route_lat = (
+        start_lat + dest_lat
+    ) / 2
 
-        historical_data = load_traffic_data()
+    route_lon = (
+        start_lon + dest_lon
+    ) / 2
 
-        if len(historical_data) < 30:
-            raise ValueError(
-                "Not enough historical traffic data for ARIMA forecasting."
-            )
 
-        # ----------------------------------------------------
-        # 2. Fit REAL ARIMA(2,1,1)
-        # ----------------------------------------------------
 
-        model = ARIMA(
-            historical_data,
-            order=(2, 1, 1)
+    # Find nearby historical traffic
+    df["distance"] = df.apply(
+        lambda x:
+        haversine(
+            route_lat,
+            route_lon,
+            x["Latitude"],
+            x["Longitude"]
+        ),
+        axis=1
+    )
+
+
+    nearby = df[
+        df["distance"] <= 10
+    ]
+
+
+
+    # If no local sensors exist
+    # use complete historical traffic behaviour
+
+    if len(nearby) < 50:
+
+        print(
+        "[ARIMA] No local sensors. Using global traffic profile"
         )
 
-        fitted_model = model.fit()
+        nearby = df
 
-        # ----------------------------------------------------
-        # 3. Forecast next 24 hours
-        # ----------------------------------------------------
 
-        forecast_result = fitted_model.get_forecast(steps=24)
 
-        forecast_values = forecast_result.predicted_mean
+    # hourly aggregation
 
-        # Real 95% confidence interval
-        confidence_interval = forecast_result.conf_int(alpha=0.05)
+    nearby = nearby.sort_values(
+        "Timestamp"
+    )
 
-        # ----------------------------------------------------
-        # 4. Build frontend-friendly response
-        # ----------------------------------------------------
+    series = (
+        nearby
+        .set_index("Timestamp")
+        ["congestion_index"]
+        .resample("1h")
+        .mean()
+        .interpolate()
+    )
 
-        forecast_data = []
 
-        for i in range(24):
+    # Train ARIMA
 
-            timestamp = forecast_values.index[i]
+    model = ARIMA(
+        series,
+        order=(2,1,1)
+    )
 
-            prediction = float(forecast_values.iloc[i])
 
-            lower = float(confidence_interval.iloc[i, 0])
-            upper = float(confidence_interval.iloc[i, 1])
+    fitted = model.fit()
 
-            # Keep congestion index within 0–100
-            prediction = float(np.clip(prediction, 0, 100))
-            lower = float(np.clip(lower, 0, 100))
-            upper = float(np.clip(upper, 0, 100))
 
-            # Traffic classification
-            if prediction > 75:
-                traffic_tier = "Severe"
-            elif prediction > 40:
-                traffic_tier = "Moderate"
-            else:
-                traffic_tier = "Smooth"
 
-            forecast_data.append({
-                "hour_label": timestamp.strftime("%H:%M"),
+    forecast = fitted.get_forecast(
+        steps=24
+    )
 
-                "arima_congestion_index": round(
-                    prediction, 1
-                ),
 
-                "upper_bound_95ci": round(
-                    upper, 1
-                ),
+    values = forecast.predicted_mean
 
-                "lower_bound_95ci": round(
-                    lower, 1
-                ),
+    confidence = forecast.conf_int()
 
-                "traffic_tier": traffic_tier
-            })
 
-        # ----------------------------------------------------
-        # 5. Return result
-        # ----------------------------------------------------
 
-        return {
-            "model": "ARIMA(2,1,1) Time-Series Forecast",
-            "horizon": "24 Hours Ahead",
-            "current_hour": forecast_values.index[0].strftime("%H:%M"),
+    result=[]
 
-            "historical_records": int(len(historical_data)),
 
-            "training_start": historical_data.index[0].strftime(
-                "%Y-%m-%d %H:%M"
+    for i,value in enumerate(values):
+
+        value=float(
+            np.clip(
+                value,
+                0,
+                100
+            )
+        )
+
+
+        result.append({
+
+            "hour_label":
+            values.index[i].strftime("%H:%M"),
+
+
+            "arima_congestion_index":
+            round(value,1),
+
+
+            "upper_bound_95ci":
+            round(
+            float(
+            confidence.iloc[i,1]
             ),
+            1),
 
-            "training_end": historical_data.index[-1].strftime(
-                "%Y-%m-%d %H:%M"
+
+            "lower_bound_95ci":
+            round(
+            float(
+            confidence.iloc[i,0]
             ),
+            1),
 
-            "forecast": forecast_data
-        }
 
-    except Exception as e:
+            "traffic_tier":
+            (
+            "Severe"
+            if value>75
+            else
+            "Moderate"
+            if value>40
+            else
+            "Smooth"
+            )
 
-        print("ARIMA forecasting error:", str(e))
+        })
 
-        return {
-            "model": "ARIMA(2,1,1) Time-Series Forecast",
-            "horizon": "24 Hours Ahead",
-            "current_hour": f"{current_hour:02d}:00",
-            "forecast": [],
-            "error": str(e)
-        }
+
+
+    distance = haversine(
+        start_lat,
+        start_lon,
+        dest_lat,
+        dest_lon
+    )
+
+
+
+    return {
+
+
+        "model":
+        "Location Adaptive ARIMA(2,1,1)",
+
+
+        "route_distance_km":
+        round(distance,2),
+
+
+        "historical_records_used":
+        int(len(nearby)),
+
+
+        "forecast":
+        result
+
+    }

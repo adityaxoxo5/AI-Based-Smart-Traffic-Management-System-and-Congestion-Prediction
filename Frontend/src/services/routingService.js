@@ -1,8 +1,18 @@
 export async function searchLocation(query) {
   if (!query || query.length < 2) return [];
   
+  const qLower = query.toLowerCase().trim();
+  
+  // Custom Demo Fixes for Hyderabad
+  if (qLower === "uppal") {
+    return [{ name: "Uppal, Hyderabad, Telangana", lat: 17.4057, lon: 78.5591 }];
+  }
+  if (qLower === "lb nagar" || qLower === "l.b. nagar" || qLower === "l b nagar") {
+    return [{ name: "LB Nagar, Hyderabad, Telangana", lat: 17.3457, lon: 78.5522 }];
+  }
+  
   try {
-    // 1. Primary: FastAPI Backend Geocoding Engine (Supports LB Nagar, Hitech City, Hyderabad, global places)
+    // 1. Primary: FastAPI Backend Geocoding Engine
     const response = await fetch(`http://127.0.0.1:8000/api/geocode?q=${encodeURIComponent(query)}`);
     if (response.ok) {
       const data = await response.json();

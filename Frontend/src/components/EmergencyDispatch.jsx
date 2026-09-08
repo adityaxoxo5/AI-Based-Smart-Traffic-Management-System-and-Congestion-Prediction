@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Ambulance, MapPin, Zap, Activity } from 'lucide-react';
+import { Ambulance, MapPin, Zap } from 'lucide-react';
 
 export default function EmergencyDispatch({ startCoords, destCoords, startQuery, destQuery }) {
   const [incidentType, setIncidentType] = useState('Medical Emergency');
@@ -94,38 +94,6 @@ export default function EmergencyDispatch({ startCoords, destCoords, startQuery,
           </button>
         </div>
 
-        {/* Assigned Unit Display */}
-        {dispatchResult && (
-          <div className="bg-[#141b29] border border-rose-500/30 p-4 rounded-xl space-y-3 mb-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-xs text-slate-300 font-semibold">Closest Allocated Emergency Base</span>
-              <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
-                <Activity className="w-3 h-3" />
-                {dispatchResult.dispatch_status}
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="bg-[#0d121d] p-2.5 rounded-lg border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Station Name</span>
-                <span className="text-xs font-bold text-amber-400">{dispatchResult.assigned_hub.name}</span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">Type: {dispatchResult.assigned_hub.type}</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-[#0d121d] p-2.5 rounded-lg border border-slate-800">
-                  <span className="text-[10px] text-slate-500 block">Distance</span>
-                  <span className="text-xs font-bold text-rose-400">{dispatchResult.distance_km} km</span>
-                </div>
-                <div className="bg-[#0d121d] p-2.5 rounded-lg border border-slate-800">
-                  <span className="text-[10px] text-slate-500 block">Response ETA</span>
-                  <span className="text-xs font-bold text-emerald-400">{dispatchResult.eta_minutes} mins</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Registered Emergency Facilities List */}
         {dispatchResult?.all_stations && (
           <div className="bg-[#141b29] border border-slate-800 p-4 rounded-xl">
@@ -136,22 +104,17 @@ export default function EmergencyDispatch({ startCoords, destCoords, startQuery,
               {dispatchResult.all_stations.map((hub) => (
                 <div 
                   key={hub.id} 
-                  className={`flex items-center justify-between p-2.5 rounded-lg border transition ${
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition ${
                     dispatchResult.assigned_hub.id === hub.id
                       ? 'bg-amber-500/10 border-amber-500/40'
                       : 'bg-[#0d121d] border-slate-800'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <MapPin className={`w-3.5 h-3.5 ${dispatchResult.assigned_hub.id === hub.id ? 'text-amber-400' : 'text-slate-500'}`} />
-                    <div>
-                      <div className="text-[11px] font-bold text-slate-200">{hub.name}</div>
-                      <div className="text-[9px] text-slate-500">{hub.type}</div>
-                    </div>
+                  <MapPin className={`w-3.5 h-3.5 flex-shrink-0 ${dispatchResult.assigned_hub.id === hub.id ? 'text-amber-400' : 'text-slate-500'}`} />
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-200">{hub.name}</div>
+                    <div className="text-[9px] text-slate-500">{hub.type}</div>
                   </div>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 rounded border border-emerald-500/20">
-                    {hub.vehicles_avail} Units
-                  </span>
                 </div>
               ))}
             </div>
