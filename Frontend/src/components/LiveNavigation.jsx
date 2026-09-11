@@ -24,7 +24,7 @@ export default function LiveNavigation({ routes, startQuery, destQuery }) {
   const [stepIdx,   setStepIdx]   = useState(0);
   const [finished,  setFinished]  = useState(false);
   
-  const speed = 2; // Hardcoded default speed
+  const speed = 1; // Hardcoded default speed
 
   // Coordinates are already in [lat, lon] format from the API
   const coords = routes?.[0]?.coordinates || [];
