@@ -279,7 +279,7 @@ export default function LiveNavigation({ routes, startQuery, destQuery }) {
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0a0f18]">
           <div>
-            <span className="text-[10px] text-slate-500 uppercase font-mono tracking-widest block">Live GPS Tracking</span>
+            
             <h3 className="text-base font-bold text-slate-100">
               {hasRoute ? `${startQuery?.split(',')[0] || 'Start'} → ${destQuery?.split(',')[0] || 'Destination'}` : 'Awaiting Route'}
             </h3>
