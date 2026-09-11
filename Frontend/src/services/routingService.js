@@ -99,8 +99,42 @@ export async function calculateRoute(startCoords, destCoords) {
         if (index === 0) routeTitle = "Optimal Route (Fastest)";
 
         // Fetch Live ML Prediction from FastAPI XGBoost Model!
-        const estimatedVolume = Math.round(800 + index * 300);
-        const mlResult = await getMLPrediction(estimatedVolume, "Downtown", "Clear", currentHour);
+        // const estimatedVolume = Math.round(800 + index * 300);
+        // const mlResult = await getMLPrediction(estimatedVolume, "Downtown", "Clear", currentHour);
+        // Estimate traffic features from actual route information
+
+const estimatedVolume = Math.round(
+    route.distance / 50 + 200
+);
+
+const roadTypes = [
+    "Highway",
+    "Arterial",
+    "Downtown"
+];
+
+const estimatedRoadType =
+    roadTypes[index % roadTypes.length];
+
+
+const weatherConditions = [
+    "Clear",
+    "Rainy",
+    "Heavy Rain"
+];
+
+const estimatedWeather =
+    weatherConditions[
+        new Date().getHours() % weatherConditions.length
+    ];
+
+
+const mlResult = await getMLPrediction(
+    estimatedVolume,
+    estimatedRoadType,
+    estimatedWeather,
+    currentHour
+);
 
         return {
           id: index,
