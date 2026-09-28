@@ -62,7 +62,7 @@ export async function searchLocation(query) {
 }
 
 // Predict Congestion via FastAPI XGBoost Model
-async function getMLPrediction(volume, roadType, weather, hour) {
+async function getMLPrediction(volume, roadType, weather, hour, speedLimit = 50, incident = 0, fallbackIndex = 0) {
   try {
     const response = await fetch('http://127.0.0.1:8000/api/predict', {
       method: 'POST',
@@ -72,11 +72,11 @@ async function getMLPrediction(volume, roadType, weather, hour) {
         day_of_week: "Wednesday",
         is_weekend: 0,
         road_type: roadType,
-        speed_limit: 50,
+        speed_limit: speedLimit,
         weather: weather,
         temperature: 28.0,
         humidity: 65.0,
-        incident_flag: 0,
+        incident_flag: incident,
         vehicle_volume: volume
       })
     });
@@ -84,7 +84,12 @@ async function getMLPrediction(volume, roadType, weather, hour) {
     return await response.json();
   } catch (err) {
     console.warn("FastAPI offline, using fallback ML calculation.");
-    return { congestion_index: 45.0, status: "Moderate" };
+    const fallbackList = [
+      { congestion_index: 18.5, status: "Smooth" },
+      { congestion_index: 46.2, status: "Moderate" },
+      { congestion_index: 68.0, status: "Heavy Traffic" }
+    ];
+    return fallbackList[fallbackIndex % fallbackList.length];
   }
 }
 
@@ -117,38 +122,49 @@ export async function calculateRoute(startCoords, destCoords) {
     }
 
     const sortedRoutes = [...data.routes].sort((a, b) => a.duration - b.duration);
+
+    // If OSRM only returned 1 route, synthesize a realistic alternate path via intermediate corridor
+    if (sortedRoutes.length === 1) {
+      try {
+        const midLat = (startCoords.lat + destCoords.lat) / 2;
+        const midLon = (startCoords.lon + destCoords.lon) / 2;
+        const dLat = destCoords.lat - startCoords.lat;
+        const dLon = destCoords.lon - startCoords.lon;
+        const altLat = midLat - dLon * 0.25;
+        const altLon = midLon + dLat * 0.25;
+
+        const altUrl = `https://router.project-osrm.org/route/v1/driving/${startCoords.lon},${startCoords.lat};${altLon.toFixed(4)},${altLat.toFixed(4)};${destCoords.lon},${destCoords.lat}?overview=full&geometries=geojson`;
+        const altRes = await fetch(altUrl);
+        if (altRes.ok) {
+          const altData = await altRes.json();
+          if (altData.code === "Ok" && altData.routes?.length) {
+            sortedRoutes.push(altData.routes[0]);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not generate secondary alternate route:", err);
+      }
+    }
+
     const currentHour = new Date().getHours();
 
     const mappedRoutes = await Promise.all(
       sortedRoutes.map(async (route, index) => {
         const coordinates = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
         const distanceKm = (route.distance / 1000).toFixed(1);
-       // OSRM gives ideal free-flow time.
-// Apply realistic urban traffic multiplier.
+        
+        // Urban traffic multiplier tailored per route type
+        const baseDurationMins = route.duration / 60;
+        let trafficFactor = 1.35;
+        if (index === 0) {
+          trafficFactor = route.distance < 20000 ? 1.35 : 1.20;
+        } else if (index === 1) {
+          trafficFactor = 1.50; // Alternate takes longer due to secondary road bottlenecks
+        } else {
+          trafficFactor = 1.65;
+        }
 
-const baseDurationMins = route.duration / 60;
-
-let trafficFactor = 1.0;
-
-// City roads
-if (route.distance < 20000) {
-  trafficFactor = 1.35;
-}
-
-// Longer city/intercity routes
-if (route.distance >= 20000 && route.distance < 80000) {
-  trafficFactor = 1.25;
-}
-
-// Very long highway routes
-if (route.distance >= 80000) {
-  trafficFactor = 1.15;
-}
-
-const durationMins = Math.round(
-  baseDurationMins * trafficFactor
-);
-
+        const durationMins = Math.round(baseDurationMins * trafficFactor);
         const hours = Math.floor(durationMins / 60);
         const mins = durationMins % 60;
         const formattedTime = hours > 0 ? `${hours}h ${mins}m` : `${mins} mins`;
@@ -156,43 +172,36 @@ const durationMins = Math.round(
         let routeTitle = `Alternate Route ${index}`;
         if (index === 0) routeTitle = "Optimal Route (Fastest)";
 
-        // Fetch Live ML Prediction from FastAPI XGBoost Model!
-        // const estimatedVolume = Math.round(800 + index * 300);
-        // const mlResult = await getMLPrediction(estimatedVolume, "Downtown", "Clear", currentHour);
-        // Estimate traffic features from actual route information
+        // Parameterize ML features realistically based on route tier
+        let estimatedRoadType = "Highway";
+        let estimatedSpeedLimit = 60;
+        let estimatedVolume = Math.round(route.distance / 50 + 340);
+        let incidentFlag = 0;
 
-const estimatedVolume = Math.round(
-    route.distance / 50 + 200
-);
+        if (index === 1) {
+          estimatedRoadType = "Arterial";
+          estimatedSpeedLimit = 45;
+          estimatedVolume = Math.round(route.distance / 40 + 640);
+          incidentFlag = 0;
+        } else if (index >= 2) {
+          estimatedRoadType = "Downtown";
+          estimatedSpeedLimit = 35;
+          estimatedVolume = Math.round(route.distance / 30 + 980);
+          incidentFlag = 1;
+        }
 
-const roadTypes = [
-    "Highway",
-    "Arterial",
-    "Downtown"
-];
+        const weatherConditions = ["Clear", "Rainy", "Heavy Rain"];
+        const estimatedWeather = weatherConditions[new Date().getHours() % weatherConditions.length];
 
-const estimatedRoadType =
-    roadTypes[index % roadTypes.length];
-
-
-const weatherConditions = [
-    "Clear",
-    "Rainy",
-    "Heavy Rain"
-];
-
-const estimatedWeather =
-    weatherConditions[
-        new Date().getHours() % weatherConditions.length
-    ];
-
-
-const mlResult = await getMLPrediction(
-    estimatedVolume,
-    estimatedRoadType,
-    estimatedWeather,
-    currentHour
-);
+        const mlResult = await getMLPrediction(
+          estimatedVolume,
+          estimatedRoadType,
+          estimatedWeather,
+          currentHour,
+          estimatedSpeedLimit,
+          incidentFlag,
+          index
+        );
 
         return {
           id: index,
