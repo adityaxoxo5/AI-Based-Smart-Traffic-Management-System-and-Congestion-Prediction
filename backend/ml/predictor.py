@@ -19,6 +19,13 @@ class TrafficPredictor:
             self.dl_model = joblib.load(dl_path)
         else:
             self.dl_model = None
+        # Load LightGBM model if present
+        lgb_path = os.path.join(artifacts_dir, 'lgb_best.pkl')
+        self.lgb_model = joblib.load(lgb_path) if os.path.exists(lgb_path) else None
+        # Load RandomForest model if present
+        rf_path = os.path.join(artifacts_dir, 'rf_best.pkl')
+        self.rf_model = joblib.load(rf_path) if os.path.exists(rf_path) else None
+        print("[ML/Ensemble] LightGBM and RandomForest models loaded (if present).")
         print("[ML/DL] TrafficPredictor loaded trained XGBoost & Deep Neural Network models successfully!")
 
     def predict(self, hour, day_of_week, is_weekend, road_type, speed_limit, weather, temp, humidity, incident, volume, model_type="xgb"):
@@ -41,8 +48,20 @@ class TrafficPredictor:
         # Transform inputs
         X_scaled = self.preprocessor.transform(input_data)
         
-        # Select target model: Deep Neural Net (DL) vs XGBoost (ML)
-        target_model = self.dl_model if (model_type == "dl" and self.dl_model is not None) else self.model
+        # Select target model based on model_type
+        if model_type == "dl" and self.dl_model is not None:
+            target_model = self.dl_model
+            model_label = "Multi-Layer Perceptron DNN (MLP-DNN)"
+        elif model_type == "lgb" and self.lgb_model is not None:
+            target_model = self.lgb_model
+            model_label = "LightGBM (ML)"
+        elif model_type == "rf" and self.rf_model is not None:
+            target_model = self.rf_model
+            model_label = "Random Forest (ML)"
+        else:
+            target_model = self.model
+            model_label = "XGBoost (ML)"
+
         prediction = target_model.predict(X_scaled)[0]
         
         # Clip score between 0.0 and 100.0
@@ -61,7 +80,7 @@ class TrafficPredictor:
         return {
             'congestion_index': congestion_score,
             'status': status,
-            'model_used': "Multi-Layer Perceptron DNN (MLP-DNN)" if (model_type == "dl" and self.dl_model) else "XGBoost (ML)"
+            'model_used': model_label
         }
 
 # Global singleton predictor instance

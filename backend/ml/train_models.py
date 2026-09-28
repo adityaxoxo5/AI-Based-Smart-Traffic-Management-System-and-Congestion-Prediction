@@ -69,6 +69,8 @@ def train_and_benchmark():
     
     joblib.dump(best_model_obj, model_save_path)
     joblib.dump(models['DeepNeuralNetwork'], os.path.join(artifacts_dir, 'dl_model.pkl'))
+    joblib.dump(models['LightGBM'],          os.path.join(artifacts_dir, 'lgb_best.pkl'))
+    joblib.dump(models['RandomForest'],       os.path.join(artifacts_dir, 'rf_best.pkl'))
     
     report = {
         'best_model': best_model_name,
@@ -78,6 +80,8 @@ def train_and_benchmark():
         json.dump(report, f, indent=4)
 
     print(f"[SAVED] Best model saved at: {model_save_path}")
+    print(f"[SAVED] LightGBM  saved at: {os.path.join(artifacts_dir, 'lgb_best.pkl')}")
+    print(f"[SAVED] RandomForest saved at: {os.path.join(artifacts_dir, 'rf_best.pkl')}")
     print(f"[SAVED] Benchmark report saved at: {metrics_save_path}")
 
 if __name__ == '__main__':

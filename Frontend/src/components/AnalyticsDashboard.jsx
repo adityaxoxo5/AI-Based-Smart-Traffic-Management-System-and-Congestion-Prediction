@@ -99,17 +99,14 @@ const AnalyticsDashboard = ({ startCoords, destCoords }) => {
           </span>
         </div>
 
-        {/* Model Architecture Switcher (ML vs DL) */}
+        {/* Model Architecture Switcher */}
         <div className="mb-4">
           <label className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block mb-1.5">
             Select Active Model Architecture:
           </label>
           <div className="grid grid-cols-2 gap-1.5">
             <button
-              onClick={() => {
-                setModelType('xgb');
-                handleRunPrediction('xgb');
-              }}
+              onClick={() => { setModelType('xgb'); handleRunPrediction('xgb'); }}
               className={`px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center space-x-1.5 border ${
                 modelType === 'xgb'
                   ? 'bg-amber-500/20 border-amber-500 text-amber-400'
@@ -121,10 +118,7 @@ const AnalyticsDashboard = ({ startCoords, destCoords }) => {
             </button>
 
             <button
-              onClick={() => {
-                setModelType('dl');
-                handleRunPrediction('dl');
-              }}
+              onClick={() => { setModelType('dl'); handleRunPrediction('dl'); }}
               className={`px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center space-x-1.5 border ${
                 modelType === 'dl'
                   ? 'bg-purple-500/20 border-purple-500 text-purple-400'
@@ -134,8 +128,33 @@ const AnalyticsDashboard = ({ startCoords, destCoords }) => {
               <Brain className="w-3.5 h-3.5 text-purple-400" />
               <span>MLP</span>
             </button>
+
+            <button
+              onClick={() => { setModelType('lgb'); handleRunPrediction('lgb'); }}
+              className={`px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center space-x-1.5 border ${
+                modelType === 'lgb'
+                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                  : 'bg-[#0d121d] border-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>LightGBM</span>
+            </button>
+
+            <button
+              onClick={() => { setModelType('rf'); handleRunPrediction('rf'); }}
+              className={`px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center space-x-1.5 border ${
+                modelType === 'rf'
+                  ? 'bg-sky-500/20 border-sky-500 text-sky-400'
+                  : 'bg-[#0d121d] border-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5 text-sky-400" />
+              <span>RandomForest</span>
+            </button>
           </div>
         </div>
+
 
         <div className="space-y-3 text-xs">
           {/* Volume Slider */}
@@ -229,7 +248,7 @@ const AnalyticsDashboard = ({ startCoords, destCoords }) => {
             className="w-full mt-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-lg shadow-lg shadow-amber-500/10 transition-all flex items-center justify-center space-x-2 text-xs uppercase cursor-pointer"
           >
             <Zap className="w-3.5 h-3.5" />
-            <span>{loading ? 'COMPUTING INFERENCE...' : `RUN ${modelType === 'dl' ? 'DEEP LEARNING' : 'ML'} PREDICTION`}</span>
+            <span>{loading ? 'COMPUTING INFERENCE...' : `RUN ${modelType === 'dl' ? 'MLP' : modelType === 'lgb' ? 'LIGHTGBM' : modelType === 'rf' ? 'RANDOM FOREST' : 'XGBOOST'} PREDICTION`}</span>
           </button>
         </div>
 

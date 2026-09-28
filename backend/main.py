@@ -222,27 +222,35 @@ def ai_traffic_assistant(request: ChatRequest):
     prediction_context = ""
     if any(k in query_lower for k in ["predict", "congestion", "forecast", "traffic", "rush hour", "delay", "jam"]):
         try:
-            target_hour = 17 if ("rush" in query_lower or "evening" in query_lower) else (8 if "morning" in query_lower else 12)
+            from datetime import datetime
+            # Use real current hour (same as route planner)
+            current_hour = datetime.now().hour
+            target_hour = 17 if ("rush" in query_lower or "evening" in query_lower) else (8 if "morning" in query_lower else current_hour)
             hour_match = re.search(r'\b([0-1]?[0-9]|2[0-3])\b', user_query)
             if hour_match:
                 target_hour = int(hour_match.group(1))
 
             target_weather = "Rain" if any(w in query_lower for w in ["rain", "storm"]) else "Clear"
-            target_road = "Highway" if "highway" in query_lower else "Downtown"
-            
+            # Route planner uses Highway for primary route; Downtown for others
+            target_road = "Highway" if "highway" in query_lower else ("Downtown" if "downtown" in query_lower else "Highway")
+            speed_limit = 60 if target_road == "Highway" else 50
+            # Volume matches route planner formula: distance/50 + 340 ~ 1000 for avg urban trip
+            estimated_volume = 1600 if target_hour in [8, 9, 17, 18] else 900
+
             xgb_pred = predictor.predict(
                 hour=target_hour,
                 day_of_week="Wednesday",
                 is_weekend=0,
                 road_type=target_road,
-                speed_limit=60 if target_road == "Highway" else 50,
+                speed_limit=speed_limit,
                 weather=target_weather,
                 temp=22.0 if target_weather == "Rain" else 28.0,
-                humidity=80.0 if target_weather == "Rain" else 55.0,
+                humidity=80.0 if target_weather == "Rain" else 65.0,
                 incident=0,
-                volume=1600 if target_hour in [8, 9, 17, 18] else 900
+                volume=estimated_volume,
+                model_type="xgb"
             )
-            speed_rec = 60 if target_road == "Highway" else 50
+            speed_rec = speed_limit
             prediction_context = (
                 f"\n\n[LIVE XGBOOST MODEL PREDICTION METRICS]:\n"
                 f"- Target Context: {target_road} road | Hour {target_hour}:00 | Weather: {target_weather}\n"
@@ -252,6 +260,7 @@ def ai_traffic_assistant(request: ChatRequest):
             )
         except Exception as e:
             print(f"[Prediction Error] {e}")
+
 
     system_prompt = f"""
 You are a warm, helpful, and natural AI Assistant.
