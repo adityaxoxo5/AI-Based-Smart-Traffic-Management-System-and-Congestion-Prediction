@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import os
 import json
 import uuid
@@ -15,6 +18,7 @@ from ml.arima_forecast import generate_24h_arima_forecast
 from ml.signal_optimizer import signal_optimizer
 
 # Load environment variables from .env file
+load_dotenv(Path(__file__).resolve().parent / ".env")
 load_dotenv()
 
 app = FastAPI(title="Smart Traffic Management API", version="1.0.0")
@@ -209,7 +213,7 @@ def ai_traffic_assistant(request: ChatRequest):
 
     # Fetch live real-time weather if weather is asked!
     weather_context = ""
-    if any(w in query_lower for w in ["weather", "temp", "temperature", "rain", "forecast", "climate"]):
+    if any(w in query_lower for w in ["weather", "temperature", "rain", "climate"]):
         live_w = get_live_weather(user_query)
         if live_w:
             weather_context = f"\n\n[LIVE REAL-TIME WEATHER METRICS]:\n{live_w}\nIncorporate these exact live metrics in your response."
@@ -238,15 +242,16 @@ def ai_traffic_assistant(request: ChatRequest):
                 incident=0,
                 volume=1600 if target_hour in [8, 9, 17, 18] else 900
             )
+            speed_rec = 60 if target_road == "Highway" else 50
             prediction_context = (
                 f"\n\n[LIVE XGBOOST MODEL PREDICTION METRICS]:\n"
-                f"• Target Context: {target_road} road | Hour {target_hour}:00 | Weather: {target_weather}\n"
-                f"• Predicted Congestion Index: {xgb_pred.get('predicted_congestion_index')}% ({xgb_pred.get('status')})\n"
-                f"• Recommended Speed Limit: {xgb_pred.get('speed_limit')} km/h\n"
+                f"- Target Context: {target_road} road | Hour {target_hour}:00 | Weather: {target_weather}\n"
+                f"- Predicted Congestion Index: {xgb_pred.get('congestion_index')}% ({xgb_pred.get('status')})\n"
+                f"- Recommended Speed Limit: {speed_rec} km/h\n"
                 f"Use these exact predicted values to deliver a clear traffic forecast."
             )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Prediction Error] {e}")
 
     system_prompt = f"""
 You are a warm, helpful, and natural AI Assistant.
@@ -265,7 +270,7 @@ CRITICAL INSTRUCTIONS:
         print(f"[GenAI] Calling Gemini LLM for query: '{user_query}'...")
         try:
             client = genai.Client(api_key=api_key)
-            for model_name in ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.6-flash", "gemini-2.5-pro"]:
+            for model_name in ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash"]:
                 try:
                     response = client.models.generate_content(
                         model=model_name,
