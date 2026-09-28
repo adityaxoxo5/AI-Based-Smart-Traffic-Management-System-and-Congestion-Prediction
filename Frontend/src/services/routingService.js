@@ -3,12 +3,30 @@ export async function searchLocation(query) {
   
   const qLower = query.toLowerCase().trim();
   
-  // Custom Demo Fixes for Hyderabad
-  if (qLower === "uppal") {
-    return [{ name: "Uppal, Hyderabad, Telangana", lat: 17.4057, lon: 78.5591 }];
-  }
-  if (qLower === "lb nagar" || qLower === "l.b. nagar" || qLower === "l b nagar") {
-    return [{ name: "LB Nagar, Hyderabad, Telangana", lat: 17.3457, lon: 78.5522 }];
+  // Custom Demo Fixes for Hyderabad & major landmarks
+  const knownLocations = [
+    { keys: ["uppal"], name: "Uppal, Hyderabad, Telangana", lat: 17.4057, lon: 78.5591 },
+    { keys: ["lb nagar", "l.b. nagar", "l b nagar", "l.b nagar"], name: "LB Nagar, Hyderabad, Telangana", lat: 17.3457, lon: 78.5522 },
+    { keys: ["nagole"], name: "Nagole, Hyderabad, Telangana", lat: 17.3753, lon: 78.5604 },
+    { keys: ["dilsukhnagar", "dilsukh nagar"], name: "Dilsukhnagar, Hyderabad, Telangana", lat: 17.3688, lon: 78.5247 },
+    { keys: ["tarnaka"], name: "Tarnaka, Hyderabad, Telangana", lat: 17.4292, lon: 78.5317 },
+    { keys: ["habsiguda"], name: "Habsiguda, Hyderabad, Telangana", lat: 17.4146, lon: 78.5444 },
+    { keys: ["ramanathapur"], name: "Ramanathapur, Hyderabad, Telangana", lat: 17.3912, lon: 78.5401 },
+    { keys: ["hitec", "hitech"], name: "HITEC City, Hyderabad, Telangana", lat: 17.4435, lon: 78.3772 },
+    { keys: ["gachibowli"], name: "Gachibowli, Hyderabad, Telangana", lat: 17.4401, lon: 78.3489 },
+    { keys: ["kukatpally"], name: "Kukatpally, Hyderabad, Telangana", lat: 17.4849, lon: 78.4138 },
+    { keys: ["banjara"], name: "Banjara Hills, Hyderabad, Telangana", lat: 17.4156, lon: 78.4347 },
+    { keys: ["jubilee"], name: "Jubilee Hills, Hyderabad, Telangana", lat: 17.4319, lon: 78.4073 },
+    { keys: ["secunderabad"], name: "Secunderabad, Telangana", lat: 17.4399, lon: 78.4983 },
+    { keys: ["ameerpet"], name: "Ameerpet, Hyderabad, Telangana", lat: 17.4375, lon: 78.4482 },
+    { keys: ["charminar"], name: "Charminar, Hyderabad, Telangana", lat: 17.3616, lon: 78.4747 },
+    { keys: ["hyderabad"], name: "Hyderabad, Telangana", lat: 17.3850, lon: 78.4867 },
+  ];
+
+  for (const loc of knownLocations) {
+    if (loc.keys.some(k => qLower.includes(k))) {
+      return [{ name: loc.name, lat: loc.lat, lon: loc.lon }];
+    }
   }
   
   try {
@@ -73,12 +91,28 @@ async function getMLPrediction(volume, roadType, weather, hour) {
 // OSRM Driving Route API
 export async function calculateRoute(startCoords, destCoords) {
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${startCoords.lon},${startCoords.lat};${destCoords.lon},${destCoords.lat}?overview=full&geometries=geojson&alternatives=true`;
-    
-    const response = await fetch(url);
-    const data = await response.json();
+    const osrmUrls = [
+      `https://router.project-osrm.org/route/v1/driving/${startCoords.lon},${startCoords.lat};${destCoords.lon},${destCoords.lat}?overview=full&geometries=geojson&alternatives=true`,
+      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startCoords.lon},${startCoords.lat};${destCoords.lon},${destCoords.lat}?overview=full&geometries=geojson&alternatives=true`
+    ];
 
-    if (data.code !== "Ok" || !data.routes.length) {
+    let data = null;
+    for (const url of osrmUrls) {
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          const json = await response.json();
+          if (json.code === "Ok" && json.routes && json.routes.length > 0) {
+            data = json;
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn("OSRM mirror attempt failed, trying alternate mirror...", e);
+      }
+    }
+
+    if (!data || !data.routes || !data.routes.length) {
       throw new Error("No routes found between these locations.");
     }
 
@@ -89,7 +123,31 @@ export async function calculateRoute(startCoords, destCoords) {
       sortedRoutes.map(async (route, index) => {
         const coordinates = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
         const distanceKm = (route.distance / 1000).toFixed(1);
-        const durationMins = Math.round(route.duration / 60);
+       // OSRM gives ideal free-flow time.
+// Apply realistic urban traffic multiplier.
+
+const baseDurationMins = route.duration / 60;
+
+let trafficFactor = 1.0;
+
+// City roads
+if (route.distance < 20000) {
+  trafficFactor = 1.35;
+}
+
+// Longer city/intercity routes
+if (route.distance >= 20000 && route.distance < 80000) {
+  trafficFactor = 1.25;
+}
+
+// Very long highway routes
+if (route.distance >= 80000) {
+  trafficFactor = 1.15;
+}
+
+const durationMins = Math.round(
+  baseDurationMins * trafficFactor
+);
 
         const hours = Math.floor(durationMins / 60);
         const mins = durationMins % 60;

@@ -64,9 +64,16 @@ def geocode_location(q: str):
         return []
 
     local_db = {
+        "uppal": {"name": "Uppal, Hyderabad, Telangana, India", "lat": 17.4057, "lon": 78.5591},
+        "uppal kalan": {"name": "Uppal Kalan, Hyderabad, Telangana, India", "lat": 17.4057, "lon": 78.5591},
         "lb nagar": {"name": "LB Nagar, Hyderabad, Telangana, India", "lat": 17.3457, "lon": 78.5522},
         "l.b. nagar": {"name": "L.B. Nagar, Hyderabad, Telangana, India", "lat": 17.3457, "lon": 78.5522},
         "l.b nagar": {"name": "L.B. Nagar, Hyderabad, Telangana, India", "lat": 17.3457, "lon": 78.5522},
+        "nagole": {"name": "Nagole, Hyderabad, Telangana, India", "lat": 17.3753, "lon": 78.5604},
+        "dilsukhnagar": {"name": "Dilsukhnagar, Hyderabad, Telangana, India", "lat": 17.3688, "lon": 78.5247},
+        "tarnaka": {"name": "Tarnaka, Hyderabad, Telangana, India", "lat": 17.4292, "lon": 78.5317},
+        "habsiguda": {"name": "Habsiguda, Hyderabad, Telangana, India", "lat": 17.4146, "lon": 78.5444},
+        "ramanathapur": {"name": "Ramanathapur, Hyderabad, Telangana, India", "lat": 17.3912, "lon": 78.5401},
         "hitech city": {"name": "HITEC City, Hyderabad, Telangana, India", "lat": 17.4435, "lon": 78.3772},
         "gachibowli": {"name": "Gachibowli, Hyderabad, Telangana, India", "lat": 17.4401, "lon": 78.3489},
         "kukatpally": {"name": "Kukatpally, Hyderabad, Telangana, India", "lat": 17.4849, "lon": 78.4138},

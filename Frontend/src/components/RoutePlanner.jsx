@@ -46,18 +46,34 @@ const RoutePlanner = ({
     let currentStart = startCoords;
     let currentDest = destCoords;
 
+    let sQuery = startQuery.trim();
+    let dQuery = destQuery.trim();
+
+    // Auto-detect if user typed "Origin to Destination" in a single box
+    if (sQuery.toLowerCase().includes(" to ") && !dQuery) {
+      const parts = sQuery.split(/\s+to\s+/i);
+      if (parts.length === 2) {
+        sQuery = parts[0].trim();
+        dQuery = parts[1].trim();
+        setStartQuery(sQuery);
+        setDestQuery(dQuery);
+        currentStart = null;
+        currentDest = null;
+      }
+    }
+
     setLoading(true);
     try {
-      if (!currentStart && startQuery.trim()) {
-        const startResults = await searchLocation(startQuery);
+      if (!currentStart && sQuery) {
+        const startResults = await searchLocation(sQuery);
         if (startResults.length > 0) {
           currentStart = { lat: startResults[0].lat, lon: startResults[0].lon };
           setStartCoords(currentStart);
         }
       }
 
-      if (!currentDest && destQuery.trim()) {
-        const destResults = await searchLocation(destQuery);
+      if (!currentDest && dQuery) {
+        const destResults = await searchLocation(dQuery);
         if (destResults.length > 0) {
           currentDest = { lat: destResults[0].lat, lon: destResults[0].lon };
           setDestCoords(currentDest);
