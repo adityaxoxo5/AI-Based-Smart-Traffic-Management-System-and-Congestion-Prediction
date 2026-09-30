@@ -273,7 +273,7 @@ export default function VehicleDetection() {
             </span>
 
             <h3 className="text-base font-bold text-slate-100">
-              Annotated Traffic Feed
+              Analyzing Traffic Feed
             </h3>
           </div>
 

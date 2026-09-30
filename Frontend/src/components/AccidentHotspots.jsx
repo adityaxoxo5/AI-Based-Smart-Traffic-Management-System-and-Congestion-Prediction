@@ -24,7 +24,7 @@ const AccidentHotspots = ({ hotspots }) => {
                       : 'bg-amber-500/20 text-amber-400'
                   }`}
                 >
-                  {item.risk_level} Risk
+                {item.risk_level} Risk 
                 </span>
               </div>
               <div className="text-[11px] text-slate-400 font-mono flex items-center space-x-1 mt-1">
@@ -32,7 +32,7 @@ const AccidentHotspots = ({ hotspots }) => {
                 <span>Cluster ID: {item.cluster_id}</span>
               </div>
               <div className="flex items-center justify-between text-xs text-slate-400 mt-3 pt-2 border-t border-slate-800">
-                <span className="text-amber-400 font-semibold">{item.incident_count} Incidents Reported</span>
+                {/*<span className="text-amber-400 font-semibold">{item.incident_count} Incidents Reported</span>*/}
               </div>
             </div>
           ))
